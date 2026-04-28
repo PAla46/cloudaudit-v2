@@ -1,0 +1,36 @@
+{
+  "Provider": "aws",
+  "CheckID": "s3_bucket_public_access",
+  "CheckTitle": "Ensure S3 buckets do not allow public access",
+  "CheckType": [
+    "Software and Configuration Checks/AWS Security Best Practices"
+  ],
+  "ServiceName": "s3",
+  "SubServiceName": "",
+  "ResourceIdTemplate": "",
+  "Severity": "critical",
+  "ResourceType": "AwsS3Bucket",
+  "ResourceGroup": "storage",
+  "Description": "Checks if S3 buckets allow public access. The check fails if the bucket policy or ACL allows public access.",
+  "Risk": "Public buckets can expose sensitive data to the public internet. Anyone on the internet can read or write to objects in the bucket.",
+  "RelatedUrl": "",
+  "AdditionalURLs": [
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html"
+  ],
+  "Remediation": {
+    "Code": {
+      "CLI": "aws s3api put-public-access-block --bucket <bucket-name> --public-access-block-configuration 'BlockPublicAcls=true,BlockPublicPolicy=true,IgnorePublicAcls=true,RestrictPublicBuckets=true'",
+      "NativeIaC": "",
+      "Terraform": "",
+      "Other": "Enable S3 Block Public Access on the bucket or account level"
+    },
+    "Recommendation": {
+      "Text": "Enable S3 Block Public Access on the bucket or account level.",
+      "Url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
+    }
+  },
+  "Categories": ["internet-exposed"],
+  "DependsOn": [],
+  "RelatedTo": [],
+  "Notes": ""
+}

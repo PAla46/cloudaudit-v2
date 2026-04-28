@@ -1,0 +1,213 @@
+{
+  "Framework": "CIS",
+  "Name": "CIS AWS Foundations Benchmark",
+  "Version": "3.0",
+  "Provider": "AWS",
+  "Description": "CIS AWS Foundations Benchmark provides security best practices for AWS environments",
+  "Requirements": [
+    {
+      "Id": "1.1",
+      "Description": "Maintain detailed documentation of the AWS account",
+      "Checks": [],
+      "Attributes": {
+        "Section": "1 Identity and Access Management",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Manual",
+        "Description": "Maintain detailed documentation of the AWS account",
+        "RationaleStatement": "Documentation helps with tracking changes to IAM configurations",
+        "ImpactStatement": "Without documentation, changes may not be tracked",
+        "RemediationProcedure": "N/A - Manual check",
+        "AuditProcedure": "Review account documentation manually",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "1.2",
+      "Description": "Maintain secure cloud trails",
+      "Checks": [],
+      "Attributes": {
+        "Section": "1 Identity and Access Management",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Manual",
+        "Description": "Maintain secure cloud trails",
+        "RationaleStatement": "CloudTrail provides audit trail",
+        "ImpactStatement": "N/A",
+        "RemediationProcedure": "N/A - Manual check",
+        "AuditProcedure": "Review CloudTrail configuration",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "1.4",
+      "Description": "Ensure IAM password policy requires minimum password length",
+      "Checks": ["iam_password_policy"],
+      "Attributes": {
+        "Section": "1 Identity and Access Management",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure IAM password policy requires minimum password length of 14 or greater",
+        "RationaleStatement": "Strong passwords reduce the risk of unauthorized access",
+        "ImpactStatement": "Weak passwords can be compromised",
+        "RemediationProcedure": "Run: aws iam update-account-password-policy --minimum-password-length 14",
+        "AuditProcedure": "Check if password policy exists and has minimum length 14",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "1.5",
+      "Description": "Ensure MFA is enabled for the root user",
+      "Checks": ["iam_root_mfa_enabled"],
+      "Attributes": {
+        "Section": "1 Identity and Access Management",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure MFA is enabled for the root user",
+        "RationaleStatement": "MFA adds extra layer of security",
+        "ImpactStatement": "Root account without MFA is vulnerable to attacks",
+        "RemediationProcedure": "Enable MFA for root account via AWS Console",
+        "AuditProcedure": "Check if root account has MFA enabled",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "1.6",
+      "Description": "Ensure hardware MFA is enabled for the root user",
+      "Checks": ["iam_root_mfa_enabled"],
+      "Attributes": {
+        "Section": "1 Identity and Access Management",
+        "Profile": "Level 2",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure hardware MFA is enabled for the root user",
+        "RationaleStatement": "Hardware MFA provides additional security",
+        "ImpactStatement": "N/A",
+        "RemediationProcedure": "Enable hardware MFA for root account",
+        "AuditProcedure": "Check if root account has hardware MFA",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "1.7",
+      "Description": "Ensure IAM users have MFA enabled",
+      "Checks": ["iam_users_without_mfa"],
+      "Attributes": {
+        "Section": "1 Identity and Access Management",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure all IAM users have MFA enabled",
+        "RationaleStatement": "MFA reduces the risk of unauthorized access",
+        "ImpactStatement": "Users without MFA are vulnerable",
+        "RemediationProcedure": "Enable MFA for all IAM users",
+        "AuditProcedure": "Check if all IAM users have MFA enabled",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "1.8",
+      "Description": "Keep a minimum of one working MFA-enabled hardware MFA on the account",
+      "Checks": ["iam_root_mfa_enabled"],
+      "Attributes": {
+        "Section": "1 Identity and Access Management",
+        "Profile": "Level 2",
+        "AssessmentStatus": "Automated",
+        "Description": "Keep a minimum of one working MFA-enabled hardware MFA on the account",
+        "RationaleStatement": "Hardware MFA ensures access even if virtual MFA is lost",
+        "ImpactStatement": "N/A",
+        "RemediationProcedure": "Register a hardware MFA device",
+        "AuditProcedure": "Check if hardware MFA is enabled",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "2.1.1",
+      "Description": "Ensure S3 Block Public Access",
+      "Checks": ["s3_bucket_public_access"],
+      "Attributes": {
+        "Section": "2 Storage",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure S3 Block Public Access is enabled at account level",
+        "RationaleStatement": "Prevents accidental public access",
+        "ImpactStatement": "Public buckets can expose data",
+        "RemediationProcedure": "Enable S3 Block Public Access at account level",
+        "AuditProcedure": "Check if S3 Block Public Access is enabled",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "2.1.2",
+      "Description": "Ensure all S3 buckets have encryption at rest enabled",
+      "Checks": ["s3_bucket_server_side_encryption"],
+      "Attributes": {
+        "Section": "2 Storage",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure all S3 buckets have encryption at rest enabled",
+        "RationaleStatement": "Encryption protects data at rest",
+        "ImpactStatement": "Unencrypted data can be accessed",
+        "RemediationProcedure": "Enable default encryption on S3 buckets",
+        "AuditProcedure": "Check if S3 buckets have encryption enabled",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "2.1.3",
+      "Description": "Ensure S3 buckets have versioning enabled",
+      "Checks": ["s3_bucket_versioning_enabled"],
+      "Attributes": {
+        "Section": "2 Storage",
+        "Profile": "Level 2",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure S3 buckets have versioning enabled",
+        "RationaleStatement": "Versioning protects against accidental deletion",
+        "ImpactStatement": "Deleted objects cannot be recovered",
+        "RemediationProcedure": "Enable versioning on S3 buckets",
+        "AuditProcedure": "Check if S3 buckets have versioning enabled",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "2.2.1",
+      "Description": "Ensure EBS volumes have encryption enabled",
+      "Checks": [],
+      "Attributes": {
+        "Section": "2 Storage",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure EBS volumes have encryption enabled",
+        "RationaleStatement": "Encryption protects data at rest",
+        "ImpactStatement": "Unencrypted volumes can be accessed",
+        "RemediationProcedure": "Enable encryption when creating EBS volumes",
+        "AuditProcedure": "Check if EBS volumes are encrypted",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    },
+    {
+      "Id": "4.1",
+      "Description": "Ensure no security groups allow ingress from 0.0.0.0/0 to port 22",
+      "Checks": ["ec2_security_groups_opens_ssh"],
+      "Attributes": {
+        "Section": "4 Networking",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Automated",
+        "Description": "Ensure no security groups allow unrestricted SSH access",
+        "RationaleStatement": "Open SSH access is a security risk",
+        "ImpactStatement": "Attackers can access instances via SSH",
+        "RemediationProcedure": "Restrict SSH access to specific IPs",
+        "AuditProcedure": "Check if security groups allow SSH from 0.0.0.0/0",
+        "AdditionalInformation": "",
+        "References": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,459 @@
+CloudAudit - Complete Codebase Documentation
+1. Project Overview
+CloudAudit is a lightweight, zero-dependency multi-cloud security auditing tool. It runs entirely on AWS CLI (no boto3/pip required), making it ideal for AWS CloudShell where pip installations are blocked due to storage limits.
+Core Philosophy: Use AWS CLI JSON output → Parse → Run security checks → Output results in JSON/CSV/HTML formats.
+---
+2. Directory Structure & File Map
+cloudaudit/
+├── cloudaudit.py                          # CLI entry point, argument parsing, orchestration
+├── pyproject.toml                         # Package config (setuptools, Python ≥3.10)
+├── README.md                              # User-facing docs
+├── ARCHITECTURE.md                        # Developer guide (you have this)
+├── .gitignore
+│
+├── lib/                                   # Internal libraries
+│   ├── check/
+│   │   └── models.py                      # Base classes: Check, CheckMetadata, Check_Report_AWS
+│   └── allowlisters/
+│       └── __init__.py                    # Stub for allowlist functionality (unused currently)
+│
+├── providers/                             # Cloud provider implementations
+│   ├── __init__.py                       # Empty
+│   ├── azure.py                          # Stub for future Azure support
+│   └── aws/
+│       ├── aws_provider.py                # AWS CLI wrapper (AWSCLI, AWSProvider classes)
+│       ├── aws_regions_by_service.json    # Region config (global vs regional services)
+│       └── services/                     # Service clients + checks
+│           ├── __init__.py               # Empty
+│           ├── s3/
+│           │   ├── s3_client.py          # S3Client + S3Bucket dataclass
+│           │   ├── __init__.py           # Empty
+│           │   ├── s3_bucket_public_access/
+│           │   │   ├── __init__.py
+│           │   │   ├── s3_bucket_public_access.py   # Check class
+│           │   │   └── s3_bucket_public_access.metadata.json
+│           │   ├── s3_bucket_server_side_encryption/  (same structure)
+│           │   ├── s3_bucket_versioning_enabled/       (same structure)
+│           │   └── s3_bucket_logging_enabled/         (same structure)
+│           ├── iam/
+│           │   ├── iam_client.py         # IAMClient + IAMUser/IAMRole dataclasses
+│           │   ├── iam_root_mfa_enabled/
+│           │   ├── iam_password_policy/
+│           │   ├── iam_users_without_mfa/
+│           │   └── iam_admin_roles/
+│           ├── ec2/
+│           │   ├── ec2_client.py         # EC2Client + EC2SecurityGroup/EC2Instance
+│           │   ├── ec2_security_groups_opens_ssh/
+│           │   └── ec2_public_ips/
+│           ├── cloudtrail/
+│           │   └── cloudtrail_client.py  # CloudTrailClient (currently unused in checks)
+│           └── rds/
+│               └── rds_client.py        # RDSClient (currently unused in checks)
+│
+├── output/                                # Output formatters
+│   ├── __init__.py                       # Empty
+│   ├── json.py                           # JSONOutput, CSVOutput, HTMLOutput, ComplianceCSVOutput
+│   ├── csv.py                            # Empty (functionality in json.py)
+│   └── html.py                           # Contains "print('test')" (unused stub)
+│
+├── checks/                                # Placeholder for future check organization
+│   ├── __init__.py                       # Empty
+│   └── aws/
+│       └── __init__.py                   # Contains "print('test')" (unused stub)
+│
+└── compliance/                            # Compliance framework mappings
+    └── aws/
+        ├── cis_aws.json                  # CIS AWS Foundations Benchmark v3.0 mapping
+        └── audit_user_policy.json        # IAM policy JSON for read-only audit user
+---
+3. How Everything Works - Data Flow
+Execution Flow (Step-by-Step)
+User runs: python3 cloudaudit.py -p aws -o json
+                ↓
+    1. parse_args() → argparse processes CLI flags
+                ↓
+    2. CloudAudit.__init__(provider, output_format)
+                ↓
+    3. CloudAudit.run(service_filter, check_filter)
+                ↓
+        3a. AWSProvider() instantiated (holds AWS CLI wrapper)
+                ↓
+        3b. provider.scan() → (currently a no-op, reserved for future)
+                ↓
+        3c. _load_checks() → imports & instantiates all 10 check classes
+                ↓
+        3d. For each check:
+                ↓
+            check.execute() → returns List[Check_Report_AWS]
+                ↓
+                ├── Gets service client (e.g., get_s3_client())
+                │        ↓
+                │   ServiceClient.__init__() → fetches AWS data via CLI
+                │   Stores in dataclass instances (e.g., S3Bucket)
+                │
+                └── Iterates resources → builds Check_Report_AWS objects
+                         ↓
+                    [PASS | FAIL | UNKNOWN] + metadata
+                ↓
+    4. CloudAudit.output(filename)
+                ↓
+        JSONOutput/CSVOutput/HTMLOutput.write(findings, filename)
+                ↓
+        File written to disk (e.g., cloudaudit-123456789012-20260428153000.json)
+---
+4. Core Components Deep Dive
+4.1 cloudaudit.py - CLI Entry Point
+Location: /home/pala/Documents/cloudaudit/cloudaudit.py
+Key Parts:
+Component	Lines	Purpose
+parse_args()	111-165	Defines CLI flags: -p/--provider, -o/--output, -s/--service, -c/--check, --list-checks, etc.
+CloudAudit class	20-108	Main orchestrator
+CloudAudit._load_aws_checks()	38-61	Hardcoded list of 10 check imports & instantiations
+CloudAudit.run()	63-95	Iterates checks, calls execute(), collects findings
+CloudAudit.output()	97-108	Delegates to output handler
+main()	212-281	Entry point: parses args, runs audit, generates output files
+How to modify: To add a new check, add an import + instance in _load_aws_checks() (lines 38-61).
+---
+4.2 lib/check/models.py - Base Classes
+Location: /home/pala/Documents/cloudaudit/lib/check/models.py
+Class Hierarchy:
+CheckMetadata (dataclass)     Check_Report (dataclass)         Check (ABC)
+─────────────────────         ──────────────────────           ──────────
+Provider: str                check_id: str                    CheckID: str (auto from class name)
+CheckID: str                 check_metadata: CheckMetadata    service_name: str
+CheckTitle: str              resource: Any                    _metadata: CheckMetadata
+CheckType: list              status: str ("PASS"/"FAIL"/...)  execute() -> abstract
+Severity: str                status_extended: str             _load_metadata()
+ResourceType: str            resource_id: str                
+ResourceGroup: str                                                    ↓
+Description: str                                                    Check_Report_AWS
+Risk: str                                                            (adds resource_arn, region)
+Remediation: dict
+Categories: list
+Key behaviors:
+- Check.__init__() auto-loads .metadata.json if present (lines 105-123)
+- CheckMetadata.from_file() reads JSON, ignores "Recommendation" key (line 36)
+- Check_Report_AWS.as_dict() returns serializable dict for JSON output
+---
+4.3 providers/aws/aws_provider.py - AWS CLI Wrapper
+Location: /home/pala/Documents/cloudaudit/providers/aws/aws_provider.py
+Two classes:
+AWSCLI (lines 32-79)
+- run(command: list, parse_json: bool) - Runs subprocess, returns JSON or raw string
+- run_paginated(command, next_token_key) - Handles AWS pagination (NextToken)
+AWSProvider (lines 82-363)
+Holds the AWSCLI instance and provides all AWS API methods as Python methods:
+Method
+list_buckets()
+get_bucket_policy(name)
+get_bucket_acl(name)
+get_bucketPublicAccessBlock(name)
+get_bucket_encryption(name)
+get_bucket_versioning(name)
+get_bucket_logging(name)
+list_users()
+list_mfa_devices()
+list_roles()
+get_account_password_policy()
+list_security_groups()
+describe_instances()
+describe_db_instances()
+list_trails()
+list_functions()
+... and more
+Error handling: All methods return None or [] on failure (no exceptions propagated to checks).
+How to add new API methods: Add a new method to AWSProvider class following the pattern:
+def my_new_method(self, param: str):
+    try:
+        return self.cli.run(["aws", "service", "operation", "--param", param, "--output", "json"])
+    except AWSCLIError:
+        return None
+---
+### 4.4 Service Clients (Data Fetchers)
+Each service has a `*_client.py` file that:
+1. Defines **dataclasses** for resources (e.g., `S3Bucket`, `IAMUser`, `EC2Instance`)
+2. Has a `ServiceClient` class that fetches data in `__scan()`
+3. Uses **singleton pattern** via module-level `get_*_client()` function
+#### S3 Client (`s3_client.py`)
+**Dataclass:** `S3Bucket`
+- Fields: `name`, `creation_date`, `region`, `policy`, `acl`, `public_access_block`, `encryption`, `versioning`, `logging`, `tags`
+- Properties: `is_public`, `is_encrypted`, `is_versioning_enabled`, `is_logging_enabled`
+#### IAM Client (`iam_client.py`)
+**Dataclasses:** `IAMUser`, `IAMRole`
+- `IAMUser`: `arn`, `user_id`, `user_name`, `mfa_devices`, `access_keys`, `groups`
+- `IAMRole`: `arn`, `role_id`, `role_name`, `policies`
+- Properties: `IAMUser.has_mfa`, `IAMRole.is_admin`
+#### EC2 Client (`ec2_client.py`)
+**Dataclasses:** `EC2SecurityGroup`, `EC2Instance`
+- `EC2SecurityGroup`: `group_id`, `group_name`, `ip_permissions`, etc.
+- `EC2Instance`: `instance_id`, `public_ip`, `private_ip`, `security_groups`, etc.
+- Properties: `EC2SecurityGroup.allows_ssh`, `EC2Instance.has_public_ip`, `EC2Instance.is_running`
+#### CloudTrail Client (`cloudtrail_client.py`)
+**Dataclass:** `CloudTrailTrail`
+- Fields: `name`, `s3_bucket_name`, `is_multi_region`, `cloud_watch_logs_group`, etc.
+- Properties: `is_enabled`, `is_not_empty`
+#### RDS Client (`rds_client.py`)
+**Dataclasses:** `RDSDBInstance`, `RDSSnapshot`
+- `RDSDBInstance`: `db_instance_identifier`, `storage_encrypted`, `publicly_accessible`, etc.
+---
+4.5 Check Implementation Pattern
+Every check follows this exact pattern:
+File: providers/aws/services/{service}/{check_name}/{check_name}.py
+from lib.check.models import Check, Check_Report_AWS
+from providers.aws.services.{service}.{service}_client import get_{service}_client
+class {check_name}(Check):
+    def __init__(self):
+        super().__init__()
+        self.service_name = "{service}"
+        # Set all metadata fields:
+        self._metadata.CheckID = "{check_name}"
+        self._metadata.CheckTitle = "..."
+        self._metadata.Severity = "critical|high|medium|low"
+        self._metadata.ResourceType = "Aws{Service}{Resource}"
+        self._metadata.ResourceGroup = "..."
+        self._metadata.Description = "..."
+        self._metadata.Risk = "..."
+        self._metadata.Categories = [...]
+        self._metadata.Remediation = {"Code": {"CLI": "..."}, "Recommendation": {...}}
+    
+    def execute(self):
+        findings = []
+        client = get_{service}_client()  # Get singleton client
+        
+        for resource in client.resources:
+            report = Check_Report_AWS(
+                check_id=self.CheckID,
+                check_metadata=self._metadata,
+                resource=resource
+            )
+            # Determine PASS/FAIL
+            report.status = "PASS" if condition else "FAIL"
+            report.status_extended = f"..."
+            report.region = resource.region  # or "us-east-1" for global
+            report.resource_id = resource.id
+            report.resource_arn = f"arn:aws:..."
+            findings.append(report)
+        
+        return findings
+# Module-level instance (imported by cloudaudit.py)
+{check_name}_instance = {check_name}()
+Optional: Add {check_name}.metadata.json in the same directory for external metadata (auto-loaded by Check._load_metadata()).
+---
+4.6 Output Formatters (output/json.py)
+Classes:
+Class	Purpose
+JSONOutput	Findings → JSON with compliance mapping
+CSVOutput	Findings → Prowler-compatible CSV (semicolon-delimited, 36 cols)
+HTMLOutput	Findings → Bootstrap 4 styled HTML with DataTables
+ComplianceCSVOutput	Findings → CIS compliance CSV
+Compliance mapping: get_requirement_mapping(check_id) reads compliance/aws/cis_aws.json and returns matched requirements.
+---
+4.7 Compliance Mapping (compliance/aws/cis_aws.json)
+Maps CIS AWS Foundations Benchmark v3.0 requirements to check IDs:
+{
+  "Framework": "CIS",
+  "Name": "CIS AWS Foundations Benchmark",
+  "Version": "3.0",
+  "Requirements": [
+    {
+      "Id": "1.5",
+      "Description": "Ensure MFA is enabled for the root user",
+      "Checks": ["iam_root_mfa_enabled"],
+      "Attributes": {
+        "Section": "1 Identity and Access Management",
+        "Profile": "Level 1",
+        "AssessmentStatus": "Automated"
+      }
+    }
+  ]
+}
+Current mappings:
+- iam_password_policy → CIS 1.4
+- iam_root_mfa_enabled → CIS 1.5, 1.6, 1.8
+- iam_users_without_mfa → CIS 1.7
+- s3_bucket_public_access → CIS 2.1.1
+- s3_bucket_server_side_encryption → CIS 2.1.2
+- s3_bucket_versioning_enabled → CIS 2.1.3
+- ec2_security_groups_opens_ssh → CIS 4.1
+---
+5. How to Modify / Extend CloudAudit
+5.1 Adding a New Check (Most Common Task)
+Step 1: Create the check directory:
+mkdir -p providers/aws/services/s3/s3_new_check
+touch providers/aws/services/s3/s3_new_check/__init__.py
+Step 2: Create the check file (s3_new_check.py):
+from lib.check.models import Check, Check_Report_AWS
+from providers.aws.services.s3.s3_client import get_s3_client
+class s3_new_check(Check):
+    def __init__(self):
+        super().__init__()
+        self.service_name = "s3"
+        self._metadata.CheckID = "s3_new_check"
+        self._metadata.CheckTitle = "Ensure S3 buckets have X configured"
+        self._metadata.Severity = "high"
+        self._metadata.ResourceType = "AwsS3Bucket"
+        self._metadata.ResourceGroup = "storage"
+        self._metadata.Description = "..."
+        self._metadata.Risk = "..."
+        self._metadata.Categories = ["category"]
+        self._metadata.Remediation = {
+            "Code": {"CLI": "aws s3api ..."},
+            "Recommendation": {"Text": "...", "Url": "..."}
+        }
+    
+    def execute(self):
+        findings = []
+        client = get_s3_client()
+        
+        for bucket in client.buckets:
+            report = Check_Report_AWS(
+                check_id=self.CheckID,
+                check_metadata=self._metadata,
+                resource=bucket
+            )
+            # Your logic here
+            report.status = "PASS"  # or "FAIL"
+            report.status_extended = f"S3 Bucket {bucket.name} ..."
+            report.region = bucket.region
+            report.resource_id = bucket.name
+            report.resource_arn = f"arn:aws:s3:::{bucket.name}"
+            findings.append(report)
+        
+        return findings
+s3_new_check_instance = s3_new_check()
+Step 3: Register in cloudaudit.py → _load_aws_checks():
+from providers.aws.services.s3.s3_new_check.s3_new_check import s3_new_check
+return [
+    # ... existing checks ...
+    s3_new_check(),
+]
+Step 4 (Optional): Add metadata JSON file:
+{
+  "Provider": "aws",
+  "CheckID": "s3_new_check",
+  "CheckTitle": "Ensure S3 buckets have X configured",
+  "Severity": "high",
+  ...
+}
+---
+5.2 Adding a New Service (e.g., Lambda)
+Step 1: Create service client (providers/aws/services/lambda/lambda_client.py):
+from dataclasses import dataclass, field
+from typing import List, Optional
+from providers.aws.aws_provider import AWSProvider
+@dataclass
+class LambdaFunction:
+    function_name: str
+    function_arn: str
+    runtime: str
+    role: str
+    # ... add more fields
+class LambdaClient:
+    def __init__(self, provider: AWSProvider):
+        self.provider = provider
+        self.functions: List[LambdaFunction] = []
+        self.__scan()
+    
+    def __scan(self):
+        data = self.provider.list_functions()
+        for func in data.get("Functions", []):
+            self.functions.append(LambdaFunction(
+                function_name=func.get("FunctionName", ""),
+                function_arn=func.get("FunctionArn", ""),
+                runtime=func.get("Runtime", ""),
+                # ... map more fields
+            ))
+lambda_client = None
+def get_lambda_client(provider=None):
+    global lambda_client
+    if lambda_client is None:
+        if provider is None:
+            provider = AWSProvider()
+        lambda_client = LambdaClient(provider)
+    return lambda_client
+Step 2: Add API method to AWSProvider in aws_provider.py:
+def list_functions(self):
+    return self.cli.run_paginated([
+        "aws", "lambda", "list-functions", "--output", "json"
+    ])
+Step 3: Update aws_regions_by_service.json if the service is regional (not global).
+Step 4: Create checks under providers/aws/services/lambda/lambda_*check_name*/.
+---
+5.3 Adding a New Output Format
+In output/json.py:
+class NewFormatOutput:
+    def write(self, findings, filename=None, account_id=""):
+        # Transform findings to your format
+        output = transform(findings)
+        
+        if filename:
+            with open(filename, "w") as f:
+                f.write(output)
+        
+        return output
+Register in cloudaudit.py:
+- Add to output_handlers dict in CloudAudit.output() (line 98-102)
+- Add CLI choice in parse_args() (line 122-126)
+---
+5.4 Modifying Existing Checks
+To change the logic of s3_bucket_public_access:
+1. Open providers/aws/services/s3/s3_bucket_public_access/s3_bucket_public_access.py
+2. Modify the execute() method (lines 39-63)
+3. Update metadata in __init__() if needed
+---
+5.5 Adding Compliance Mappings
+In compliance/aws/cis_aws.json:
+{
+  "Id": "4.2",
+  "Description": "Ensure no security groups allow ingress from 0.0.0.0/0 to port 3389",
+  "Checks": ["ec2_security_groups_opens_rdp"],
+  "Attributes": {
+    "Section": "4 Networking",
+    "Profile": "Level 1",
+    "AssessmentStatus": "Automated"
+  }
+}
+The get_requirement_mapping() function in output/json.py will automatically pick up new mappings.
+---
+6. CLI Usage Reference
+# Run all AWS checks
+python3 cloudaudit.py -p aws
+# Run specific service
+python3 cloudaudit.py -p aws -s s3
+# Run specific check
+python3 cloudaudit.py -p aws -c s3_bucket_public_access
+# Output to JSON file
+python3 cloudaudit.py -p aws -o json --output-file audit.json
+# Output to HTML
+python3 cloudaudit.py -p aws -o html --output-file audit.html
+# Filter by severity
+python3 cloudaudit.py -p aws --severity critical
+# List available checks
+python3 cloudaudit.py --list-checks
+# Show version
+python3 cloudaudit.py --version
+Default output: If no --output-file specified, creates 4 files:
+- cloudaudit-{account_id}-{timestamp}.json
+- cloudaudit-{account_id}-{timestamp}.csv
+- cloudaudit-{account_id}-{timestamp}.html
+- cloudaudit-{account_id}-{timestamp}_compliance-cis_aws.csv
+---
+7. Key Design Patterns
+Pattern	Where
+Singleton	get_*_client() functions
+Dataclass	Service clients
+Abstract Base Class	Check ABC
+Metadata-driven	CheckMetadata
+CLI Wrapper	AWSCLI.run()
+Pagination	AWSCLI.run_paginated()
+---
+## 8. Current Limitations & Notes
+1. **Region handling:** `AWSProvider` is initialized with `region="us-east-1"` but `scan()` is a no-op. Regional services (EC2, RDS) only scan us-east-1.
+2. **Global services:** S3, IAM, CloudTrail are treated as global (use us-east-1).
+3. **Unused clients:** `cloudtrail_client` and `rds_client` are imported in `cloudaudit.py` (lines 11-12) but have no checks using them yet.
+4. **Error swallowing:** Most AWS API calls catch exceptions and return `None`/`, silently hiding failures.
+5. **IAM MFA check:** `iam_root_mfa_enabled` checks MFA devices by iterating ALL devices and filtering by `UserName == "root"` (inefficient).
+6. **EC2 SSH check:** `allows_ssh` property in `EC2SecurityGroup` has a bug (line 25: `for port_range in perm.get("FromPort", [])` should iterate over a range, not treat `FromPort` as a list).
+7. **HTML/CSV stubs:** `output/html.py` and `checks/aws/__init__.py` contain only `print("test")` (dead code).
+8. **No unit tests:** No test framework or test files present.
+---

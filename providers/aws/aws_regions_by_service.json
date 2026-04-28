@@ -1,0 +1,14 @@
+{
+  "global_services": ["iam", "s3", "cloudtrail", "route53", "cloudfront", "shield", "waf", "fms"],
+  "regional_services": [
+    "ec2", "rds", "lambda", "dynamodb", "s3", "efs", "fsx", 
+    "elasticache", "redshift", "neptune", "docdb", "mwaa",
+    "elasticache", "dms", "kinesis", "kinesisanalytics"
+  ],
+  "regions": [
+    "us-east-1", "us-east-2", "us-west-1", "us-west-2",
+    "eu-west-1", "eu-west-2", "eu-west-3", "eu-central-1",
+    "ap-northeast-1", "ap-northeast-2", "ap-southeast-1", "ap-southeast-2",
+    "ap-south-1", "sa-east-1", "ca-central-1"
+  ]
+}
